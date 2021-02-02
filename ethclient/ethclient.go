@@ -79,6 +79,10 @@ func (ec *Client) BlockByHash(ctx context.Context, hash common.Hash) (*types.Blo
 	return ec.getBlock(ctx, "eth_getBlockByHash", hash, true)
 }
 
+//ethermint BlockByHash
+func (ec *Client) EmBlockByHash(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+	return ec.getemBlock(ctx, "eth_getBlockByHash", hash, true)
+}
 // BlockByNumber returns a block from the current canonical chain. If number is nil, the
 // latest known block is returned.
 //
@@ -86,6 +90,11 @@ func (ec *Client) BlockByHash(ctx context.Context, hash common.Hash) (*types.Blo
 // if you don't need all transactions or uncle headers.
 func (ec *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	return ec.getBlock(ctx, "eth_getBlockByNumber", toBlockNumArg(number), true)
+}
+
+//ethermint BlockByHash
+func (ec *Client) EmBlockByNumber(ctx context.Context, number *big.Int) (map[string]interface{}, error) {
+	return ec.getemBlock(ctx, "eth_getBlockByNumber", toBlockNumArg(number), true)
 }
 
 // BlockNumber returns the most recent block number
@@ -164,6 +173,22 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		txs[i] = tx.tx
 	}
 	return types.NewBlockWithHeader(head).WithBody(txs, uncles), nil
+}
+
+//get ethermint block
+func (ec *Client) getemBlock(ctx context.Context, method string, args ...interface{}) (map[string]interface{}, error) {
+	var raw json.RawMessage
+	err := ec.c.CallContext(ctx, &raw, method, args...)
+	if err != nil {
+		return nil, err
+	} else if len(raw) == 0 {
+		return nil, ethereum.NotFound
+	}
+	emblock := make(map[string]interface{})
+	if err := json.Unmarshal(raw,&emblock); err!=nil{
+		return nil,err
+	}
+	return emblock,nil
 }
 
 // HeaderByHash returns the block header with the given hash.
@@ -526,6 +551,28 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 		return err
 	}
 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
+}
+
+func (ec *Client) EmSendBaseRawTransaction(ctx context.Context, tx interface{}) (res string,err error) {
+	result := &common.Hash{}
+	err = ec.c.CallContext(ctx, result, "eth_sendRawTransaction", tx)
+	return result.Hex(),err
+}
+
+func (ec *Client) EmSendTransaction(ctx context.Context, tx interface{}) (res string,err error) {
+	result := &common.Hash{}
+	err = ec.c.CallContext(ctx, result, "eth_sendTransaction", tx)
+	return result.Hex(),err
+}
+
+func (ec *Client) EmSendRawTransaction(ctx context.Context, tx interface{}) (res string,err error) {
+	result := &common.Hash{}
+	data, err := rlp.EncodeToBytes(tx)
+	if err != nil {
+		return "",err
+	}
+	err = ec.c.CallContext(ctx, result, "eth_sendRawTransaction", hexutil.Encode(data))
+	return result.Hex(),err
 }
 
 func toCallArg(msg ethereum.CallMsg) interface{} {
